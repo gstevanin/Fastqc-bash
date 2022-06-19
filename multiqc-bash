@@ -1,0 +1,6 @@
+#!/bin/bash
+#SBATCH --mem=2G
+module load fastqc
+module load multiqc 
+srun fastqc *.fastq.gz --outdir reads_qc
+srun multiqc *_fastqc.zip
