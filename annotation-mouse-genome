@@ -1,0 +1,4 @@
+#!/bin/bash
+#SBATCH --mem=40G
+module load star
+srun STAR --runThreadN  8 --runMode genomeGenerate --genomeDir ./genome_index --genomeFastaFiles ./GRCm39.primary_assembly.genome.fa --sjdbGTFfile ./gencode.vM29.annotation.gtf --sjdbOverhang 75 --genomeSAindexNbases 14
