@@ -1,0 +1,58 @@
+#!/bin/bash
+#SBATCH --mem=29G
+#SBATCH --cpus-per-task=8
+#SBATCH --array=0-14 
+# script errors will stop its run
+set -euo pipefail
+# upload of needed modules
+module load star/2.7.9a
+module load samtools/1.14
+module load htseq/0.13.5
+# folder of the run analysis (here "/shared/projects/form_2021_29/gstevanin/SPG11")
+base_dir="$PWD"
+# data folder
+data_dir="/shared/projects/form_2021_29/gstevanin/SPG11"
+# folder with genome and genome annotations
+genome_dir="${base_dir}/genome"
+# location of the reference genome.
+genome_file="${genome_dir}/GRCm39.primary_assembly.genome.fa"
+# location of the annotation files
+annotation_file="${genome_dir}/gencode.vM29.annotation.gtf"
+# location of the .fastq.gz files
+fastq_dir="${data_dir}/cervelet4mois"
+# Listing of all .fastq.gz files (targeting the R1 and not R2 files)
+fastq_files=(${fastq_dir}/*_R1.fastq.gz)
+# extraction of the sample names from the file names
+sample=$(basename -s _R1.fastq.gz "${fastq_files[$SLURM_ARRAY_TASK_ID]}")
+echo "=============================================================="
+echo "reads alignment on the reference genome : sample ${sample}"
+echo "=============================================================="
+mkdir -p "${base_dir}/reads_map"
+srun STAR --runThreadN "${SLURM_CPUS_PER_TASK}" \
+--runMode alignReads \
+--genomeDir "${genome_dir}/genome_index" \
+--sjdbGTFfile "${annotation_file}" \
+--readFilesCommand zcat \
+--readFilesIn "${fastq_dir}/${sample}_R1.fastq.gz" "${fastq_dir}/${sample}_R2.fastq.gz" \
+--outFilterType BySJout \
+--outSAMtype BAM Unsorted \
+--quantMode GeneCounts \
+--outFileNamePrefix "${base_dir}/reads_map/${sample}_" \
+--outFilterIntronMotifs RemoveNoncanonical \
+echo "=============================================================="
+echo "ordering the aligned reads : sample ${sample}"
+echo "=============================================================="
+srun samtools sort "${base_dir}/reads_map/${sample}_Aligned.out.bam" \
+-o "${base_dir}/reads_map/${sample}_Aligned.sorted.out.bam"
+echo "=============================================================="
+echo "Indexing the aligned reads : sample ${sample}"
+echo "=============================================================="
+srun samtools index "${base_dir}/reads_map/${sample}_Aligned.sorted.out.bam"
+echo "=============================================================="
+echo "Read counts : sample ${sample}"
+echo "=============================================================="
+mkdir -p "${base_dir}/counts/${sample}"
+srun htseq-count --order=pos --stranded=reverse \
+--mode=union \
+"${base_dir}/reads_map/${sample}_Aligned.sorted.out.bam" \
+"${annotation_file}" > "${base_dir}/counts/${sample}/count_${sample}.txt“
